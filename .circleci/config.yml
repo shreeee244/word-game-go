@@ -82,26 +82,41 @@ jobs:
               PGPASSWORD=wordgame psql -h localhost -U wordgame -d wordgame -v ON_ERROR_STOP=1 -f "$f"
             done
       - run:
-          name: Build and start app
+          name: Run integration tests (app + tests in one shell)
           command: |
+            # Build the app.
             go build -o /tmp/app .
+            echo "built /tmp/app"
+
+            # Start it in the background of THIS shell.
             /tmp/app > /tmp/app.log 2>&1 &
-            echo "waiting for app to be ready..."
+            APP_PID=$!
+            echo "app started with PID $APP_PID"
+
+            # Give it up to 60 seconds to become healthy.
             for i in $(seq 1 60); do
               if curl -sf http://localhost:8080/health > /dev/null; then
                 echo "app is ready"
-                exit 0
+                break
               fi
               sleep 1
             done
-            echo "app never became healthy; logs:"
-            cat /tmp/app.log
-            exit 1
-          background: true
-      - run:
-          name: Integration tests
-          command: go test -tags=integration ./tests/... -v -timeout 5m
 
+            # If it never came up, dump the app log and fail.
+            if ! curl -sf http://localhost:8080/health > /dev/null; then
+              echo "app never became healthy; app log:"
+              cat /tmp/app.log
+              exit 1
+            fi
+
+            # Run the tests in the SAME shell — the app is a child of this
+            # shell, so CircleCI cannot reap it until this step ends.
+            go test -tags=integration ./tests/... -v -timeout 5m
+            TEST_EXIT=$?
+
+            # Clean up.
+            kill $APP_PID 2>/dev/null || true
+            exit $TEST_EXIT
   secret-scan:
     docker:
       - image: cimg/base:stable
