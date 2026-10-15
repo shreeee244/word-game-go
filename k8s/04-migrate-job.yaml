@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+  namespace: word-game
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:16-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres -U wordgame -d wordgame; do
+                echo "waiting for postgres..."
+                sleep 2
+              done
+          envFrom:
+            - secretRef:
+                name: word-game-secrets
+      containers:
+        - name: migrate
+          image: shrustieeepatil/daily-word-game:1.0
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: word-game-secrets
+                  key: POSTGRES_PASSWORD
+          envFrom:
+            - secretRef:
+                name: word-game-secrets
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              for f in /app/migrations/*.sql; do
+                echo "applying $f"
+                psql -h postgres -U wordgame -d wordgame -v ON_ERROR_STOP=1 -f "$f"
+              done
