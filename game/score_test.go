@@ -36,9 +36,9 @@ func TestScore(t *testing.T) {
 			name:   "mixed present and absent",
 			guess:  "SLATE",
 			answer: "CRANE",
-						// pos2 A==A → Correct
+			// pos2 A==A → Correct
 			// pos4 E==E → Correct
-			want:   []Mark{Absent, Absent, Correct, Absent, Correct},
+			want: []Mark{Absent, Absent, Correct, Absent, Correct},
 		},
 		{
 			name:   "greens consume the answer's copy before yellows",
@@ -59,7 +59,7 @@ func TestScore(t *testing.T) {
 			//   pos4: Y → remaining[Y]=0 → Absent
 			want: []Mark{Present, Present, Correct, Correct, Absent},
 		},
-		 		{
+		{
 			// THE HARD ONE from the brief.
 			// Answer CRANE has exactly one E.  Guess EERIE has three E's.
 			// Only one of the guess's three E's is coloured (the green at
