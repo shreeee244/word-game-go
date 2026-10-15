@@ -178,3 +178,10 @@ behaviour and is the test I would write first.
 docker compose up --build
 curl localhost:8080/health
 # {"status":"ok","postgres":true,"redis":true}
+## Duplicate letters — the hard part
+
+Each letter in the **answer** is a physical tile that can colour **at most one**
+letter of the guess. Greens claim first; yellows only if a copy of that letter
+is still unclaimed.
+
+Example — answer `CRANE`, guess `EERIE`:
