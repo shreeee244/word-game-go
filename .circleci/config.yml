@@ -150,4 +150,3 @@ workflows:
           requires: [lint, unit]
       - image-build:
           requires: [integration, secret-scan]
-          
