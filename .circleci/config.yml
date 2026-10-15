@@ -81,7 +81,7 @@ jobs:
               echo "applying $f"
               PGPASSWORD=wordgame psql -h localhost -U wordgame -d wordgame -v ON_ERROR_STOP=1 -f "$f"
             done
-         - run:
+      - run:
           name: Build and start app
           command: |
             go build -o /tmp/app .
