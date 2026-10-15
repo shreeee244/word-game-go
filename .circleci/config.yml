@@ -1,0 +1,139 @@
+version: 2.1
+
+orbs:
+  go: circleci/go@1.11
+
+jobs:
+  lint:
+    docker:
+      - image: cimg/go:1.22
+    steps:
+      - checkout
+      - go/load-cache:
+          key: go-mod-v1
+      - run: go mod download
+      - go/save-cache:
+          key: go-mod-v1
+      - run:
+          name: go vet
+          command: go vet ./...
+      - run:
+          name: gofmt check
+          command: |
+            out=$(gofmt -l .)
+            if [ -n "$out" ]; then
+              echo "these files need gofmt:"; echo "$out"; exit 1
+            fi
+
+  unit:
+    docker:
+      - image: cimg/go:1.22
+    steps:
+      - checkout
+      - go/load-cache:
+          key: go-mod-v1
+      - run: go mod download
+      - run:
+          name: Unit tests
+          command: go test ./game/... -race -covermode=atomic -coverprofile=coverage.out
+      - run:
+          name: Coverage gate (70% on ./game/...)
+          command: |
+            pct=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | tr -d '%')
+            echo "coverage: ${pct}%"
+            awk -v p="$pct" 'BEGIN { if (p+0 < 70) { print "FAIL: coverage below 70%"; exit 1 } }'
+      - store_artifacts:
+          path: coverage.out
+
+  integration:
+    docker:
+      - image: cimg/go:1.22
+      - image: cimg/postgres:16.0
+        environment:
+          POSTGRES_USER: wordgame
+          POSTGRES_PASSWORD: wordgame
+          POSTGRES_DB: wordgame
+      - image: cimg/redis:7.2
+    environment:
+      DATABASE_URL: postgres://wordgame:wordgame@localhost:5432/wordgame?sslmode=disable
+      REDIS_URL: redis://localhost:6379/0
+      APP_URL: http://localhost:8080
+      PORT: "8080"
+    steps:
+      - checkout
+      - go/load-cache:
+          key: go-mod-v1
+      - run: go mod download
+      - run:
+          name: Install psql client
+          command: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - run:
+          name: Wait for Postgres
+          command: |
+            for i in $(seq 1 30); do
+              pg_isready -h localhost -U wordgame && break
+              sleep 2
+            done
+      - run:
+          name: Apply migrations
+          command: |
+            for f in migrations/*.sql; do
+              echo "applying $f"
+              PGPASSWORD=wordgame psql -h localhost -U wordgame -d wordgame -v ON_ERROR_STOP=1 -f "$f"
+            done
+      - run:
+          name: Start app in background
+          command: go run . &
+          background: true
+      - run:
+          name: Integration tests
+          command: go test -tags=integration ./tests/... -v -timeout 5m
+
+  secret-scan:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - checkout
+      - run:
+          name: Install gitleaks
+          command: |
+            curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz \
+              | tar -xz -C /tmp gitleaks
+            sudo mv /tmp/gitleaks /usr/local/bin/
+      - run:
+          name: Scan for secrets
+          command: gitleaks detect --source . --verbose --redact --no-git
+
+  image-build:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          name: Build image
+          command: docker build -t daily-word-game:ci .
+      - run:
+          name: Push to Docker Hub
+          command: |
+            if [ -z "$DOCKERHUB_USERNAME" ] || [ -z "$DOCKERHUB_TOKEN" ]; then
+              echo "No Docker Hub credentials configured; skipping push."
+              exit 0
+            fi
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            docker tag daily-word-game:ci "$DOCKERHUB_USERNAME/daily-word-game:1.0"
+            docker tag daily-word-game:ci "$DOCKERHUB_USERNAME/daily-word-game:latest"
+            docker push "$DOCKERHUB_USERNAME/daily-word-game:1.0"
+            docker push "$DOCKERHUB_USERNAME/daily-word-game:latest"
+
+workflows:
+  build-test-ship:
+    jobs:
+      - lint
+      - unit
+      - secret-scan
+      - integration:
+          requires: [lint, unit]
+      - image-build:
+          requires: [integration, secret-scan]

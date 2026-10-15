@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: wordgame
+      POSTGRES_PASSWORD: wordgame
+      POSTGRES_DB: wordgame
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wordgame -d wordgame"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  # One-shot container: applies migrations/*.sql in filename order, then exits.
+  migrate:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: wordgame
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        set -e;
+        for f in /app/migrations/*.sql; do
+          echo "applying $$f";
+          psql -h postgres -U wordgame -d wordgame -v ON_ERROR_STOP=1 -f "$$f";
+        done
+    restart: "no"
+  app:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://wordgame:wordgame@postgres:5432/wordgame?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:
+  

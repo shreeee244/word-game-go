@@ -124,3 +124,57 @@ feature itself.
 | `relation "..." does not exist` | Migrations did not run, or the app started before they finished. |
 | Build takes minutes every time | `COPY . .` is above your dependency install. |
 | CI cannot reach the database | In CircleCI service containers the host **is** `localhost` — the opposite of compose. |
+
+---
+
+## Implementation notes
+
+### The duplicate-letters problem
+
+The rule: each letter in the **answer** is a physical tile that may colour **at
+most one** letter of the guess. Greens are assigned first and *consume* the
+answer's tile; yellows are then handed out only while a copy of that letter is
+still unclaimed.
+
+**Worked example (the one the brief calls out):**
+
+Answer `CRANE`, guess `EERIE`.
+
+The green E at position 4 consumes the answer's single E. The other two E's in
+the guess have nothing left to match against, so they are **grey**, not yellow.
+The naive implementation — "colour any letter that appears in the answer" —
+would wrongly colour all three E's.
+
+**Why two passes and not one:** greens must claim first. If yellows were
+assigned first, a yellow guess letter could steal the tile that a green guess
+letter needs. Example: answer `BABES`, guess `ABBEY` — the yellow `B` at
+position 1 must not consume the answer's `B` at position 2, because the guess's
+`B` at position 2 is a green.
+
+`game/score.go` implements this as:
+
+1. Pass 1 — walk the guess; mark `Correct` where guess[i] == answer[i], and
+   decrement a running count of the answer's letters.
+2. Pass 2 — walk the guess again; for each non-Correct position, assign
+   `Present` only if that letter's count is still positive, then decrement.
+
+The test `TestScore/duplicate_letters:_only_one_E_may_be_coloured` pins this
+behaviour and is the test I would write first.
+
+### What was added to the starter
+
+- `game/score_test.go` — table-driven unit tests, ≥70% coverage on `./game/...`
+- `Dockerfile` — multi-stage, pinned Go 1.22.5-alpine3.20, deps before source,
+  non-root, `psql` included so one image can also run migrations
+- `docker-compose.yml` — postgres + redis + one-shot migrate + app, ordered by
+  healthchecks and `service_completed_successfully`
+- `.circleci/config.yml` — lint → unit → integration → secret-scan → image-build
+- `tests/integration_test.go` — hits real Postgres and Redis, tagged `integration`
+- `.dockerignore`, `.gitignore`
+
+### Running it
+
+```bash
+docker compose up --build
+curl localhost:8080/health
+# {"status":"ok","postgres":true,"redis":true}

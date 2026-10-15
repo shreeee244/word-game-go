@@ -1,0 +1,19 @@
+# Build artefacts
+/bin/
+*.exe
+*.out
+coverage.txt
+coverage.html
+
+# Local environment
+.env
+_paste_me.txt
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
