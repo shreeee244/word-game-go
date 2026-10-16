@@ -1,187 +1,343 @@
-# Daily Word Game
+# 🎮 Daily Word Game
 
-**Language:** Go &nbsp;|&nbsp; **Needs:** Postgres + Redis
+A daily word-guessing game built with **Go**, backed by PostgreSQL and Redis, and containerized with Docker. The project includes automated testing, CircleCI configuration, and Kubernetes deployment manifests for running the application on a local cluster.
 
-This is a **starter**. The application already works. Your job is everything
-that gets it building, tested and running in CI.
+## ✨ Features
 
----
+- **Go backend** — HTTP API for the word game.
+- **Daily gameplay** — game state and guess-related functionality.
+- **PostgreSQL** — stores word data and application records.
+- **Redis** — supports game-state storage and caching.
+- **Docker** — packages the application into a container image.
+- **Docker Compose** — runs the application and its dependencies locally.
+- **Kubernetes** — manifests for the application, database, Redis, and migrations.
+- **Automated testing** — unit and integration test files.
+- **CircleCI** — CI/CD pipeline configuration.
 
-## You do not need Go installed
+## 🛠️ Tech Stack
 
-You will build this into a container, and the container brings its own
-Go 1.22. If you have never written a line of Go, you can still finish
-this assignment — you are not being asked to extend the app, you are being
-asked to ship it.
-
-Read the two sections below in order. The first tells you what the app needs;
-the second is how you turn that into a Dockerfile.
-
----
-
-## 1. What this app actually needs
-
-This is the whole contract. Everything in your Dockerfile and compose file
-comes from this table.
-
-| | |
+| Technology | Purpose |
 |---|---|
-| **Runtime** | Go 1.22 |
-| **Install dependencies** | `go mod download` |
-| **Start the app** | `go run .` |
-| **Listens on** | port 8080, bound to `0.0.0.0` |
-| **Environment variables** | `DATABASE_URL`, `REDIS_URL`, `PORT` |
-| **Needs running first** | Postgres, Redis, and the migrations applied |
+| Go | Backend application |
+| PostgreSQL 16 | Relational database |
+| Redis 7 | Game-state storage and caching |
+| Docker | Containerization |
+| Docker Compose | Local multi-container orchestration |
+| Kubernetes | Application deployment and orchestration |
+| Minikube | Local Kubernetes cluster |
+| kubectl | Kubernetes resource management |
+| CircleCI | Continuous integration configuration |
 
-### Endpoints
+## 📁 Project Structure
 
+```text
+Daily Word Game/
+├── .circleci/
+│   └── config.yml
+├── game/
+│   ├── errors.go
+│   ├── score_test.go
+│   └── score.go
+├── k8s/
+│   ├── 00-namespace.yaml
+│   ├── 01-secrets.yaml
+│   ├── 02-postgres.yaml
+│   ├── 03-redis.yaml
+│   ├── 04-migrate-job.yaml
+│   ├── 05-app.yaml
+│   └── 06-ingress.yaml
+├── migrations/
+├── tests/
+│   └── integration_test.go
+├── .dockerignore
+├── .gitignore
+├── docker-compose.yml
+├── Dockerfile
+├── go.mod
+├── go.sum
+├── main.go
+└── README.md
 ```
-GET  /health                    is it alive, and are Postgres and Redis reachable
-GET  /game?player=NAME          today's board for that player
-POST /guess                     {"player": "asha", "guess": "CRANE"}
-```
 
-`/health` reports Postgres and Redis **separately**. Use it constantly:
-if it says `postgres: false`, the app started fine and your compose wiring
-is wrong — do not go looking in the application code.
+## ⚙️ Prerequisites
 
-### Migrations
+Install the following tools:
 
-`migrations/` holds `.sql` files that must be applied **in filename order**,
-before the app starts. They create the tables and insert sample data, so the
-app is worth looking at the first time you run it.
+- [Go](https://go.dev/dl/)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- [Git](https://git-scm.com/)
+- [Minikube](https://minikube.sigs.k8s.io/docs/start/)
+- [kubectl](https://kubernetes.io/docs/tasks/tools/)
 
-You do not need an ORM or a migration tool. A container running `psql` over
-the files in order is enough, and works whatever language the app is in.
+## 🚀 Run Locally
 
----
-
-## 2. What you must write
-
-| File | What it has to do |
-|---|---|
-| `Dockerfile` | Build this app into an image. Install dependencies **before** copying the source, pin the base image version, and do not run as root. |
-| `docker-compose.yml` | Start the app, Postgres, Redis and a migration step with one `docker compose up`. |
-| `.circleci/config.yml` | lint → unit tests → integration tests → secret scan → image build |
-| Unit tests | For `game/score.go`. No database, no network. |
-| Integration tests | Against a real Postgres and Redis as CircleCI service containers. |
-
-Then push your image to **your own Docker Hub account**, tagged with a real
-version number — `:1.0`, not only `:latest`.
-
-### When it works
+### 1. Clone the repository
 
 ```bash
-docker compose up --build
-curl localhost:8080/health
+git clone https://github.com/shreeee244/word-game-go.git
+cd word-game-go
 ```
 
-```json
-{"status":"ok","postgres":true,"redis":true}
-```
+### 2. Start the application
 
-Both true, or you are not finished.
-
----
-
-## 3. If you want to run it without Docker first
-
-Optional, and only useful if you already have Go 1.22. Most people should
-skip straight to the Dockerfile — the whole point is that the container
-removes this step.
+Build and start the services using Docker Compose:
 
 ```bash
-go mod download
-export DATABASE_URL=...
-go run .
+docker compose up --build -d
 ```
 
----
-
-## Where the marks are
-
-`game/score.go` is **pure logic** — plain functions over plain data, no database and
-no HTTP. That is deliberate, so a 70% coverage target is achievable rather
-than busywork. Start your tests there.
-
-Go has a test runner built in: `go test ./game/... -cover`. Table-driven tests suit this problem perfectly.
-
-## The hard part
-
-Duplicate letters. If the answer is CRANE and the guess is EERIE, there is exactly ONE E in the answer — so only one of the guess's three E's may be coloured, and greens claim first. Write that test before you write anything else.
-
-Write your answer to this in your README. It is worth more marks than the
-feature itself.
-
----
-
-## Getting unstuck
-
-| Symptom | Almost always |
-|---|---|
-| `/health` says `postgres: false` | Wrong hostname. Inside compose the host is the **service name**, not `localhost`. |
-| Page will not load, logs look fine | No `ports:` mapping, or the app is bound to `127.0.0.1` instead of `0.0.0.0`. |
-| `relation "..." does not exist` | Migrations did not run, or the app started before they finished. |
-| Build takes minutes every time | `COPY . .` is above your dependency install. |
-| CI cannot reach the database | In CircleCI service containers the host **is** `localhost` — the opposite of compose. |
-
----
-
-## Implementation notes
-
-### The duplicate-letters problem
-
-The rule: each letter in the **answer** is a physical tile that may colour **at
-most one** letter of the guess. Greens are assigned first and *consume* the
-answer's tile; yellows are then handed out only while a copy of that letter is
-still unclaimed.
-
-**Worked example (the one the brief calls out):**
-
-Answer `CRANE`, guess `EERIE`.
-
-The green E at position 4 consumes the answer's single E. The other two E's in
-the guess have nothing left to match against, so they are **grey**, not yellow.
-The naive implementation — "colour any letter that appears in the answer" —
-would wrongly colour all three E's.
-
-**Why two passes and not one:** greens must claim first. If yellows were
-assigned first, a yellow guess letter could steal the tile that a green guess
-letter needs. Example: answer `BABES`, guess `ABBEY` — the yellow `B` at
-position 1 must not consume the answer's `B` at position 2, because the guess's
-`B` at position 2 is a green.
-
-`game/score.go` implements this as:
-
-1. Pass 1 — walk the guess; mark `Correct` where guess[i] == answer[i], and
-   decrement a running count of the answer's letters.
-2. Pass 2 — walk the guess again; for each non-Correct position, assign
-   `Present` only if that letter's count is still positive, then decrement.
-
-The test `TestScore/duplicate_letters:_only_one_E_may_be_coloured` pins this
-behaviour and is the test I would write first.
-
-### What was added to the starter
-
-- `game/score_test.go` — table-driven unit tests, ≥70% coverage on `./game/...`
-- `Dockerfile` — multi-stage, pinned Go 1.22.5-alpine3.20, deps before source,
-  non-root, `psql` included so one image can also run migrations
-- `docker-compose.yml` — postgres + redis + one-shot migrate + app, ordered by
-  healthchecks and `service_completed_successfully`
-- `.circleci/config.yml` — lint → unit → integration → secret-scan → image-build
-- `tests/integration_test.go` — hits real Postgres and Redis, tagged `integration`
-- `.dockerignore`, `.gitignore`
-
-### Running it
+Check the services:
 
 ```bash
-docker compose up --build
-curl localhost:8080/health
-# {"status":"ok","postgres":true,"redis":true}
-## Duplicate letters — the hard part
+docker compose ps
+```
 
-Each letter in the **answer** is a physical tile that can colour **at most one**
-letter of the guess. Greens claim first; yellows only if a copy of that letter
-is still unclaimed.
+View application logs:
 
-Example — answer `CRANE`, guess `EERIE`:
+```bash
+docker compose logs -f app
+```
+
+### 3. Test the application
+
+Open these URLs in your browser:
+
+- **Homepage:** http://localhost:8080/
+- **Health check:** http://localhost:8080/health
+
+Or use PowerShell:
+
+```powershell
+Invoke-RestMethod http://localhost:8080/
+Invoke-RestMethod http://localhost:8080/health
+```
+
+A healthy response should report that the application is running and that PostgreSQL and Redis are connected.
+
+### 4. Stop the application
+
+```bash
+docker compose down
+```
+
+To also delete the persisted database volume:
+
+```bash
+docker compose down -v
+```
+
+**Warning:** Removing the volume deletes the database data stored in it.
+
+## ☸️ Kubernetes Deployment
+
+This project includes Kubernetes manifests for PostgreSQL, Redis, database migrations, and the Go application.
+
+### 1. Start Minikube
+
+```bash
+minikube start --driver=docker
+```
+
+Verify the cluster:
+
+```bash
+kubectl get nodes
+```
+
+### 2. Create the namespace
+
+The workload manifests use the `word-game` namespace.
+
+```bash
+kubectl apply -f k8s/00-namespace.yaml
+```
+
+If that manifest doesn't create the `word-game` namespace, create it with:
+
+```bash
+kubectl create namespace word-game
+```
+
+### 3. Configure application secrets
+
+```bash
+kubectl apply -f k8s/01-secrets.yaml
+```
+
+Before publishing the repository, remove hard-coded credentials from the committed Secret manifest and use a secure method to provide credentials. Do not commit production passwords or access tokens.
+
+### 4. Deploy PostgreSQL and Redis
+
+```bash
+kubectl apply -f k8s/02-postgres.yaml
+kubectl apply -f k8s/03-redis.yaml
+```
+
+Wait for PostgreSQL:
+
+```bash
+kubectl rollout status deployment/postgres -n word-game --timeout=120s
+```
+
+Check the database storage claim:
+
+```bash
+kubectl get pvc -n word-game
+```
+
+### 5. Run database migrations
+
+```bash
+kubectl apply -f k8s/04-migrate-job.yaml
+kubectl wait --for=condition=complete job/migrate -n word-game --timeout=180s
+```
+
+Inspect the migration logs:
+
+```bash
+kubectl logs job/migrate -n word-game
+```
+
+### 6. Deploy the Go application
+
+```bash
+kubectl apply -f k8s/05-app.yaml
+kubectl rollout status deployment/app -n word-game --timeout=180s
+```
+
+Check the deployed resources:
+
+```bash
+kubectl get pods -n word-game
+kubectl get services -n word-game
+kubectl get jobs -n word-game
+```
+
+### 7. Access the application
+
+Forward the Kubernetes Service to your local machine:
+
+```bash
+kubectl port-forward service/app 8080:8080 -n word-game
+```
+
+Keep the terminal open while testing the endpoints in another terminal.
+
+**Homepage**
+
+```powershell
+Invoke-RestMethod http://localhost:8080/
+```
+
+**Health check**
+
+```powershell
+Invoke-RestMethod http://localhost:8080/health
+```
+
+**Retrieve a player's game state**
+
+```powershell
+Invoke-RestMethod "http://localhost:8080/game?player=Shrustie"
+```
+
+The `POST /guess` endpoint is also available. Refer to the request handler in `main.go` for its required request body.
+
+## 🔌 API Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/` | Returns service information and available endpoints |
+| `GET` | `/health` | Reports application and dependency health |
+| `GET` | `/game?player=NAME` | Retrieves the game state for a player |
+| `POST` | `/guess` | Submits a guess |
+
+## 🧪 Testing
+
+The repository contains test files for game scoring and integration testing.
+
+Run the Go test suite:
+
+```bash
+go test ./...
+```
+
+Run tests with the race detector:
+
+```bash
+go test -race ./...
+```
+
+The integration tests may require the application's dependencies to be available. Check `tests/integration_test.go` for any required configuration before running them.
+
+## 🔄 Continuous Integration
+
+The repository includes `.circleci/config.yml` for CircleCI pipeline configuration.
+
+To enable the pipeline:
+
+1. Push the repository to GitHub.
+2. Connect the GitHub repository to CircleCI.
+3. Review the jobs and workflows defined in `.circleci/config.yml`.
+4. Configure any required environment variables or credentials in CircleCI.
+5. Push a commit and review the pipeline result.
+
+The exact checks and deployment actions depend on the workflow configured in `config.yml`.
+
+## 🔍 Troubleshooting
+
+**Check Kubernetes pods**
+
+```bash
+kubectl get pods -n word-game
+```
+
+**View application logs**
+
+```bash
+kubectl logs deployment/app -n word-game
+```
+
+**View migration logs**
+
+```bash
+kubectl logs job/migrate -n word-game
+```
+
+**Inspect a failing pod**
+
+```bash
+kubectl describe pods -n word-game
+```
+
+**Check Services**
+
+```bash
+kubectl get services -n word-game
+```
+
+If the application is unhealthy, verify that PostgreSQL and Redis are ready, the Services are available, and the environment variables match the configured service names.
+
+## 🔐 Security
+
+- Never commit real passwords, access tokens, or private keys.
+- Use Kubernetes Secrets or an external secret manager for credentials.
+- Configure GitHub and CircleCI credentials through their secure settings.
+- Use strong credentials outside local development.
+- Review `.gitignore` and `.dockerignore` before publishing.
+
+## 🎯 Learning Outcomes
+
+This project provides practical experience with:
+
+- Building a backend application using Go.
+- Designing and testing game-scoring logic.
+- Integrating PostgreSQL and Redis.
+- Containerizing a Go application with Docker.
+- Running multi-container applications with Docker Compose.
+- Deploying workloads with Kubernetes.
+- Managing database migrations and persistent storage.
+- Configuring health probes and Kubernetes Services.
+- Writing Go unit and integration tests.
+- Configuring a CircleCI pipeline.
+
