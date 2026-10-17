@@ -343,3 +343,21 @@ This project provides practical experience with:
 
 author 
 shrustie patil
+
+## Git Branch Promotion Workflow
+
+This project uses a pull-request-based workflow:
+
+1. **Feature → main:** Submit feature changes through pull requests.
+2. **main → staging:** Promote reviewed changes for validation.
+3. **staging → prod:** Promote validated changes for release.
+
+Each promotion is reviewed through a pull request before merging.
+
+## Git Branch Promotion Workflow
+
+1. Feature branches are merged into main through pull requests.
+2. Main is promoted to staging through a pull request.
+3. Staging is promoted to prod through a pull request.
+
+Each promotion provides a review point before changes move forward.
